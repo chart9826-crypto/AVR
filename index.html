@@ -1,244 +1,393 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>Simple Mobile AR Lab - Motor Status</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AR Honda Sonic Red Black</title>
 
-  <!-- Open-source libraries. The versions are pinned so A-Frame and AR.js match. -->
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+  <!-- A-Frame + AR.js -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar.js"></script>
 
   <style>
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       overflow: hidden;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #111;
+      font-family: Arial, sans-serif;
     }
 
-    #top-panel {
+    #controlPanel {
       position: fixed;
-      top: 12px;
+      z-index: 999;
       left: 50%;
+      bottom: 18px;
       transform: translateX(-50%);
-      z-index: 20;
-      width: min(92vw, 520px);
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: rgba(0, 0, 0, 0.68);
+      width: min(94vw, 430px);
+      padding: 14px;
+      border-radius: 20px;
+      background: rgba(0,0,0,.82);
       color: white;
       text-align: center;
-      font-size: 15px;
-      line-height: 1.4;
-      backdrop-filter: blur(4px);
+      backdrop-filter: blur(8px);
     }
 
-    #controls {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 18px;
-      z-index: 20;
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      padding: 0 12px;
+    #status {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: #8eeaff;
     }
 
     button {
-      min-width: 132px;
-      min-height: 48px;
       border: 0;
       border-radius: 12px;
-      padding: 10px 14px;
+      padding: 13px 25px;
+      margin: 4px;
+      color: white;
       font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      touch-action: manipulation;
+      font-weight: bold;
     }
 
-    #run-button { background: #ffffff; color: #111111; }
-    #status-button { background: #ffd54f; color: #111111; }
+    #startBtn {
+      background: #d71920;
+    }
 
-    .hint {
-      display: block;
-      margin-top: 4px;
+    #stopBtn {
+      background: #444;
+    }
+
+    button:active {
+      transform: scale(.94);
+    }
+
+    .info {
+      margin-top: 7px;
       font-size: 12px;
-      opacity: 0.8;
+      color: #ddd;
     }
   </style>
-
-  <script>
-    // A tiny reusable component that rotates an object without extra libraries.
-    AFRAME.registerComponent('spin-control', {
-      schema: {
-        axis: { type: 'string', default: 'y' },
-        speed: { type: 'number', default: 180 },
-        active: { type: 'boolean', default: true }
-      },
-
-      tick: function (_time, deltaMs) {
-        if (!this.data.active || !deltaMs) return;
-
-        const radians = THREE.MathUtils.degToRad(this.data.speed * deltaMs / 1000);
-        const axis = this.data.axis;
-
-        if (axis === 'x') this.el.object3D.rotation.x += radians;
-        if (axis === 'y') this.el.object3D.rotation.y += radians;
-        if (axis === 'z') this.el.object3D.rotation.z += radians;
-      }
-    });
-
-    window.addEventListener('DOMContentLoaded', () => {
-      const marker = document.querySelector('#hiro-marker');
-      const shaft = document.querySelector('#shaft');
-      const motorBody = document.querySelector('#motor-body');
-      const warningLamp = document.querySelector('#warning-lamp');
-      const arLabel = document.querySelector('#ar-label');
-      const topPanel = document.querySelector('#top-panel');
-      const runButton = document.querySelector('#run-button');
-      const statusButton = document.querySelector('#status-button');
-
-      let running = true;
-      let warning = false;
-
-      marker.addEventListener('markerFound', () => {
-        topPanel.innerHTML = 'พบ Hiro Marker แล้ว — โมเดลมอเตอร์พร้อมใช้งาน<span class="hint">แตะปุ่มด้านล่างเพื่อทดลองควบคุม</span>';
-      });
-
-      marker.addEventListener('markerLost', () => {
-        topPanel.innerHTML = 'เล็งกล้องไปที่ Hiro Marker<span class="hint">วาง Marker บนโต๊ะที่มีแสงเพียงพอและให้เห็นกรอบดำครบทั้งสี่ด้าน</span>';
-      });
-
-      runButton.addEventListener('click', () => {
-        running = !running;
-        shaft.setAttribute('spin-control', 'active', running);
-        runButton.textContent = running ? 'หยุดมอเตอร์' : 'เริ่มมอเตอร์';
-      });
-
-      statusButton.addEventListener('click', () => {
-        warning = !warning;
-
-        if (warning) {
-          motorBody.setAttribute('color', '#ef5350');
-          warningLamp.setAttribute('color', '#ff1744');
-          warningLamp.setAttribute('material', 'emissive', '#ff1744');
-          arLabel.setAttribute('value', 'MOTOR M1\nSTATUS: WARNING');
-          statusButton.textContent = 'เปลี่ยนเป็นปกติ';
-        } else {
-          motorBody.setAttribute('color', '#1976d2');
-          warningLamp.setAttribute('color', '#00e676');
-          warningLamp.setAttribute('material', 'emissive', '#00c853');
-          arLabel.setAttribute('value', 'MOTOR M1\nSTATUS: NORMAL');
-          statusButton.textContent = 'จำลองคำเตือน';
-        }
-      });
-    });
-  </script>
 </head>
 
 <body>
-  <div id="top-panel">
-    เล็งกล้องไปที่ Hiro Marker
-    <span class="hint">อนุญาตให้เว็บไซต์ใช้กล้องเมื่อเบราว์เซอร์ถาม</span>
-  </div>
 
-  <div id="controls">
-    <button id="run-button" type="button">หยุดมอเตอร์</button>
-    <button id="status-button" type="button">จำลองคำเตือน</button>
-  </div>
+<div id="controlPanel">
+  <div id="status">กำลังเปิดกล้อง... ส่องไปที่ Hiro Marker</div>
 
-  <a-scene
-    embedded
-    vr-mode-ui="enabled: false"
-    renderer="logarithmicDepthBuffer: true; antialias: true; colorManagement: true"
-    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false"
-  >
-    <a-marker
-      id="hiro-marker"
-      preset="hiro"
-      emitevents="true"
-      smooth="true"
-      smooth-count="8"
-      smooth-tolerance="0.01"
-      smooth-threshold="3"
-    >
-      <!-- Floor plate -->
+  <button id="startBtn" onclick="startBike()">🏍️ START / ล้อหมุน</button>
+  <button id="stopBtn" onclick="stopBike()">⛔ STOP</button>
+
+  <div class="info">AR Honda Sonic • แดง/ดำ • ล้อแม็ก</div>
+</div>
+
+<a-scene
+  embedded
+  vr-mode-ui="enabled:false"
+  renderer="antialias:true; alpha:true"
+  arjs="sourceType:webcam; trackingMethod:best; debugUIEnabled:false">
+
+  <a-marker
+    id="hiroMarker"
+    preset="hiro"
+    emitevents="true">
+
+    <!-- ========================================= -->
+    <!-- MOTORCYCLE GROUP -->
+    <!-- ========================================= -->
+    <a-entity id="motorcycle" position="0 0.15 0">
+
+      <!-- เงารถ -->
+      <a-ellipse
+        position="0 0.02 0"
+        rotation="-90 0 0"
+        scale="1.8 .65 .65"
+        color="#111"
+        opacity=".35"
+        material="transparent:true">
+      </a-ellipse>
+
+      <!-- ตัวถังหลักสีแดง -->
       <a-box
-        position="0 0.04 0"
-        width="1.35"
-        height="0.08"
-        depth="0.85"
-        color="#455a64"
-        roughness="0.8"
-      ></a-box>
+        position="0 .75 0"
+        width="1.55"
+        height=".42"
+        depth=".55"
+        color="#d71920"
+        radius=".08">
+      </a-box>
 
-      <!-- Two mounting feet -->
-      <a-box position="-0.42 0.15 0" width="0.18" height="0.18" depth="0.55" color="#263238"></a-box>
-      <a-box position="0.42 0.15 0" width="0.18" height="0.18" depth="0.55" color="#263238"></a-box>
+      <!-- แฟริ่งด้านหน้า -->
+      <a-box
+        position="-.73 .88 0"
+        width=".48"
+        height=".65"
+        depth=".48"
+        rotation="0 0 -12"
+        color="#d71920">
+      </a-box>
 
-      <!-- Motor housing: cylinder lies along X axis -->
+      <!-- แฟริ่งดำ -->
+      <a-box
+        position="-.55 .72 0"
+        width=".62"
+        height=".22"
+        depth=".58"
+        color="#111111"
+        rotation="0 0 -8">
+      </a-box>
+
+      <!-- เบาะ -->
+      <a-box
+        position=".28 1.02 0"
+        width=".72"
+        height=".12"
+        depth=".48"
+        color="#111111"
+        rotation="0 0 -3">
+      </a-box>
+
+      <!-- ท้ายรถ -->
+      <a-box
+        position=".75 .87 0"
+        width=".48"
+        height=".35"
+        depth=".5"
+        color="#111111"
+        rotation="0 0 8">
+      </a-box>
+
+      <!-- ไฟหน้า -->
+      <a-box
+        position="-.98 1.02 0"
+        width=".06"
+        height=".22"
+        depth=".28"
+        color="#fff8c4"
+        material="emissive:#fff8c4; emissiveIntensity:1">
+      </a-box>
+
+      <!-- ไฟท้าย -->
+      <a-box
+        position="1.02 .92 0"
+        width=".06"
+        height=".14"
+        depth=".25"
+        color="#ff1744"
+        material="emissive:#ff1744; emissiveIntensity:.8">
+      </a-box>
+
+      <!-- แฮนด์ -->
       <a-cylinder
-        id="motor-body"
-        position="0 0.47 0"
+        position="-.45 1.24 0"
+        radius=".035"
+        height=".78"
         rotation="0 0 90"
-        radius="0.32"
-        height="0.72"
-        segments-radial="32"
-        color="#1976d2"
-        metalness="0.25"
-        roughness="0.55"
-      ></a-cylinder>
+        color="#222">
+      </a-cylinder>
 
-      <!-- Rear cap -->
+      <!-- แผงหน้าปัด -->
+      <a-box
+        position="-.53 1.18 0"
+        width=".22"
+        height=".16"
+        depth=".18"
+        color="#222">
+      </a-box>
+
+      <!-- กระจก -->
       <a-cylinder
-        position="-0.40 0.47 0"
-        rotation="0 0 90"
-        radius="0.27"
-        height="0.12"
-        color="#90a4ae"
-      ></a-cylinder>
+        position="-.48 1.39 -.25"
+        radius=".06"
+        height=".04"
+        rotation="90 0 0"
+        color="#607d8b">
+      </a-cylinder>
 
-      <!-- Shaft assembly: parent fixes the shaft direction; child spins locally -->
-      <a-entity position="0.52 0.47 0" rotation="0 0 90">
+      <a-cylinder
+        position="-.48 1.39 .25"
+        radius=".06"
+        height=".04"
+        rotation="90 0 0"
+        color="#607d8b">
+      </a-cylinder>
+
+      <!-- เครื่องยนต์ -->
+      <a-box
+        position=".05 .48 0"
+        width=".48"
+        height=".38"
+        depth=".4"
+        color="#424242">
+      </a-box>
+
+      <a-cylinder
+        position=".05 .52 -.22"
+        radius=".16"
+        height=".06"
+        rotation="90 0 0"
+        color="#757575">
+      </a-cylinder>
+
+      <!-- ท่อไอเสีย -->
+      <a-cylinder
+        position=".62 .48 -.32"
+        radius=".07"
+        height=".75"
+        rotation="0 0 90"
+        color="#303030">
+      </a-cylinder>
+
+      <a-cylinder
+        position="1.0 .48 -.32"
+        radius=".1"
+        height=".28"
+        rotation="0 0 90"
+        color="#111111">
+      </a-cylinder>
+
+      <!-- ================================= -->
+      <!-- ล้อหลัง -->
+      <!-- ================================= -->
+      <a-entity id="rearWheel" position=".62 .42 0" rotation="90 0 0">
+
         <a-cylinder
-          id="shaft"
-          radius="0.09"
-          height="0.42"
-          color="#cfd8dc"
-          metalness="0.8"
-          roughness="0.2"
-          spin-control="axis: y; speed: 220; active: true"
-        >
-          <a-box position="0 0.12 0.09" width="0.05" height="0.18" depth="0.06" color="#ffeb3b"></a-box>
+          radius=".43"
+          height=".16"
+          color="#111111">
         </a-cylinder>
+
+        <!-- ล้อแม็ก -->
+        <a-torus
+          radius=".31"
+          radius-tubular=".045"
+          color="#bdbdbd">
+        </a-torus>
+
+        <a-cylinder
+          radius=".07"
+          height=".20"
+          color="#757575">
+        </a-cylinder>
+
+        <!-- ก้านแม็ก -->
+        <a-box position=".15 0 0" width=".48" height=".035" depth=".035" color="#e0e0e0"></a-box>
+        <a-box position="-.15 0 0" width=".48" height=".035" depth=".035" color="#e0e0e0"></a-box>
+        <a-box position="0 .15 0" width=".035" height=".48" depth=".035" color="#e0e0e0"></a-box>
+        <a-box position="0 -.15 0" width=".035" height=".48" depth=".035" color="#e0e0e0"></a-box>
+
       </a-entity>
 
-      <!-- Status lamp -->
-      <a-sphere
-        id="warning-lamp"
-        position="0 0.87 0"
-        radius="0.075"
-        color="#00e676"
-        material="emissive: #00c853; emissiveIntensity: 0.8"
-      ></a-sphere>
+      <!-- ================================= -->
+      <!-- ล้อหน้า -->
+      <!-- ================================= -->
+      <a-entity id="frontWheel" position="-.72 .42 0" rotation="90 0 0">
 
-      <!-- AR information label -->
+        <a-cylinder
+          radius=".43"
+          height=".16"
+          color="#111111">
+        </a-cylinder>
+
+        <!-- ล้อแม็ก -->
+        <a-torus
+          radius=".31"
+          radius-tubular=".045"
+          color="#bdbdbd">
+        </a-torus>
+
+        <a-cylinder
+          radius=".07"
+          height=".20"
+          color="#757575">
+        </a-cylinder>
+
+        <!-- ก้านแม็ก -->
+        <a-box position=".15 0 0" width=".48" height=".035" depth=".035" color="#e0e0e0"></a-box>
+        <a-box position="-.15 0 0" width=".48" height=".035" depth=".035" color="#e0e0e0"></a-box>
+        <a-box position="0 .15 0" width=".035" height=".48" depth=".035" color="#e0e0e0"></a-box>
+        <a-box position="0 -.15 0" width=".035" height=".48" depth=".035" color="#e0e0e0"></a-box>
+
+      </a-entity>
+
+      <!-- ขาตั้ง -->
+      <a-cylinder
+        position=".15 .18 .28"
+        radius=".025"
+        height=".45"
+        rotation="0 0 -15"
+        color="#333">
+      </a-cylinder>
+
+      <!-- โลโก้/ข้อความ -->
       <a-text
-        id="ar-label"
-        value="MOTOR M1\nSTATUS: NORMAL"
-        position="0 1.12 0"
-        rotation="-90 0 0"
+        value="SONIC"
+        position="0 .84 -.31"
+        rotation="0 0 0"
         align="center"
-        width="2.4"
         color="#ffffff"
-        side="double"
-      ></a-text>
-    </a-marker>
+        scale=".38 .38 .38">
+      </a-text>
 
-    <a-entity camera></a-entity>
-  </a-scene>
+    </a-entity>
+
+  </a-marker>
+
+  <a-entity camera></a-entity>
+</a-scene>
+
+<script>
+  let running = false;
+  let lastTime = performance.now();
+  let wheelRotation = 0;
+
+  const frontWheel = document.getElementById("frontWheel");
+  const rearWheel = document.getElementById("rearWheel");
+  const status = document.getElementById("status");
+
+  const marker = document.getElementById("hiroMarker");
+
+  marker.addEventListener("markerFound", function () {
+    status.textContent = "พบ Hiro Marker ✓ Honda Sonic พร้อมใช้งาน";
+  });
+
+  marker.addEventListener("markerLost", function () {
+    status.textContent = "ไม่พบ Marker — ส่องกล้องไปที่ Hiro Marker";
+  });
+
+  function startBike() {
+    running = true;
+    status.textContent = "🏍️ เครื่องติดแล้ว — ล้อกำลังหมุน";
+  }
+
+  function stopBike() {
+    running = false;
+    status.textContent = "⛔ รถหยุดแล้ว";
+  }
+
+  function animate(now) {
+    const delta = (now - lastTime) / 1000;
+    lastTime = now;
+
+    if (running) {
+      // หมุนล้อ
+      wheelRotation += delta * 900;
+
+      frontWheel.setAttribute(
+        "rotation",
+        "90 0 " + wheelRotation
+      );
+
+      rearWheel.setAttribute(
+        "rotation",
+        "90 0 " + wheelRotation
+      );
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  requestAnimationFrame(animate);
+</script>
+
 </body>
 </html>
